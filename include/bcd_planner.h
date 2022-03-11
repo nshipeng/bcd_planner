@@ -15,6 +15,8 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <Eigen/Core>
+#include <Eigen/Geometry>
+#include <Eigen/Dense>
 
 using namespace Eigen;
 
@@ -130,22 +132,22 @@ public:
     int cellIndex;
 };
 
-bool operator<(const Point2D& p1, const Point2D& p2)
+static bool operator<(const Point2D& p1, const Point2D& p2)
 {
     return (p1.x < p2.x || (p1.x == p2.x && p1.y < p2.y));
 }
 
-bool operator<(const Event& e1, const Event& e2)
+static bool operator<(const Event& e1, const Event& e2)
 {
     return (e1.x < e2.x || (e1.x == e2.x && e1.y < e2.y) || (e1.x == e2.x && e1.y == e2.y && e1.obstacle_index < e2.obstacle_index));
 }
 
-bool operator==(const Point2D& p1, const Point2D& p2)
+static bool operator==(const Point2D& p1, const Point2D& p2)
 {
     return (p1.x==p2.x && p1.y==p2.y);
 }
 
-bool operator!=(const Point2D& p1, const Point2D& p2)
+static bool operator!=(const Point2D& p1, const Point2D& p2)
 {
     return !(p1==p2);
 }
@@ -211,12 +213,13 @@ private:
 class bcd_planner
 {
     public:
-       bcd_planner(){}
+       bcd_planner();
 
-       bcd_planner(std::vector<std::vector<cv::Point>>& wall_polygon, std::vector<std::vector<cv::Point>>&obstcal_polygon, double robot_radius,std::deque<Point2D>& path);
-       bcd_planner(std::vector<std::vector<Vector2d>>& wall_polygon, std::vector<std::vector<Vector2d>>&obstcal_polygon, double robot_radius,std::deque<Vector2d>& path);
-       bcd_planner(std::vector<std::vector<Vector3d>>& wall_polygon, std::vector<std::vector<Vector3d>>&obstcal_polygon, double robot_radius);
+       void plan(std::vector<std::vector<cv::Point>>& wall_polygon, std::vector<std::vector<cv::Point>>&obstcal_polygon, double robot_radius,std::deque<Point2D>& path);
+       void plan(std::vector<std::vector<Vector2d>>& wall_polygon, std::vector<std::vector<Vector2d>>&obstcal_polygon, double robot_radius,std::deque<Vector2d>& path);
+       void plan(std::vector<std::vector<Vector3d>>& wall_polygon, std::vector<std::vector<Vector3d>>&obstcal_polygon, double robot_radius,std::deque<Vector2d>& path);
 
+       
        void TestAllExamples();
 
         
@@ -225,8 +228,17 @@ class bcd_planner
 
         //data
         double robot_radius_;
+        double resolution;                       //resolution of the map
+        double inv_resolution;
+        int num_of_colums;                        //map size  
+        int num_of_rows;
+        Matrix4d t_map_world;                      //first convert world polygon data to map
+        bool show_map = false;
 
-        void plan(std::vector<std::vector<cv::Point>>& wall_polygon, std::vector<std::vector<cv::Point>>&obstcal_polygon, double robot_radius, std::deque<Point2D>& path);
+        void init();                      //set t_map_world  
+        Vector2i world2map(double x,double y);
+        Vector2d map2world(int col, int row);   
+        void plan_in(std::vector<std::vector<cv::Point>>& wall_polygon, std::vector<std::vector<cv::Point>>&obstcal_polygon, double robot_radius, std::deque<Point2D>& path);
 
         int WrappedIndex(int index, int list_length);
         void WalkThroughGraph(std::vector<CellNode>& cell_graph, int cell_index, int& unvisited_counter, std::deque<CellNode>& path); //DFS

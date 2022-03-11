@@ -5,16 +5,23 @@
 
 #include "bcd_planner.h"
 
-bcd_planner::bcd_planner(std::vector<std::vector<cv::Point>>& wall_polygon, std::vector<std::vector<cv::Point>>&obstcal_polygon, double robot_radius,std::deque<Point2D>& path){
-    plan(wall_polygon,obstcal_polygon,robot_radius,path);
+bcd_planner::bcd_planner(){
+    init();
 }
 
-bcd_planner::bcd_planner(std::vector<std::vector<Vector2d>>& wall_polygon, std::vector<std::vector<Vector2d>>&obstcal_polygon, double robot_radius,std::deque<Vector2d>& path){
+
+void bcd_planner::plan(std::vector<std::vector<cv::Point>>& wall_polygon, std::vector<std::vector<cv::Point>>&obstcal_polygon, double robot_radius,std::deque<Point2D>& path){
+    robot_radius *= inv_resolution;
+    plan_in(wall_polygon,obstcal_polygon,robot_radius,path);
+}
+
+void bcd_planner::plan(std::vector<std::vector<Vector2d>>& wall_polygon, std::vector<std::vector<Vector2d>>&obstcal_polygon, double robot_radius,std::deque<Vector2d>& path){
      std::vector<std::vector<cv::Point>>wall_polygon_points;
      std::vector<cv::Point> points;
      for(int i = 0;i<wall_polygon.size(); i++){
          for(int j = 0; j<wall_polygon[i].size();j++){
-             points.push_back(cv::Point(wall_polygon[i][j](0),wall_polygon[i][j](1)));
+             Vector2i map_point = world2map(wall_polygon[i][j](0),wall_polygon[i][j](1));
+             points.push_back(cv::Point(map_point(0),map_point(1)));
          }
          wall_polygon_points.push_back(points);
      }
@@ -23,19 +30,54 @@ bcd_planner::bcd_planner(std::vector<std::vector<Vector2d>>& wall_polygon, std::
      std::vector<cv::Point> obstacl_points;
      for(int i = 0;i<obstcal_polygon.size(); i++){
          for(int j = 0; j<obstcal_polygon[i].size();j++){
-             obstacl_points.push_back(cv::Point(wall_polygon[i][j](0),wall_polygon[i][j](1)));
+             Vector2i map_point = world2map(obstcal_polygon[i][j](0),obstcal_polygon[i][j](1));
+             obstacl_points.push_back(cv::Point(map_point(0),map_point(1)));
          }
          obstacl_polygon_points.push_back(obstacl_points);
      }
 
      std::deque<Point2D>deque_path;
-     plan(wall_polygon_points,obstacl_polygon_points,robot_radius,deque_path);
+     robot_radius *= inv_resolution;
+     plan_in(wall_polygon_points,obstacl_polygon_points,robot_radius,deque_path);
      for(auto p : deque_path){
-         path.push_back(Vector2d(p.x,p.y));
+         Vector2d path_point = map2world(p.x,p.y);
+         path.push_back(Vector2d(path_point(0),path_point(1)));
      }
  }
 
-void bcd_planner::plan(std::vector<std::vector<cv::Point>>& wall_polygon, std::vector<std::vector<cv::Point>>&obstcal_polygon, double robot_radius, std::deque<Point2D>& path){
+void bcd_planner::plan(std::vector<std::vector<Vector3d>>& wall_polygon, std::vector<std::vector<Vector3d>>&obstcal_polygon, double robot_radius,std::deque<Vector2d>& path){
+     std::vector<std::vector<cv::Point>>wall_polygon_points;
+     std::vector<cv::Point> points;
+     for(int i = 0;i<wall_polygon.size(); i++){
+         for(int j = 0; j<wall_polygon[i].size();j++){
+             Vector2i map_point = world2map(wall_polygon[i][j](0),wall_polygon[i][j](1));
+             points.push_back(cv::Point(map_point(0),map_point(1)));
+         }
+         wall_polygon_points.push_back(points);
+     }
+
+     std::vector<std::vector<cv::Point>>obstacl_polygon_points;
+     std::vector<cv::Point> obstacl_points;
+     for(int i = 0;i<obstcal_polygon.size(); i++){
+         for(int j = 0; j<obstcal_polygon[i].size();j++){
+             Vector2i map_point = world2map(obstcal_polygon[i][j](0),obstcal_polygon[i][j](1));
+             obstacl_points.push_back(cv::Point(map_point(0),map_point(1)));
+         }
+         obstacl_polygon_points.push_back(obstacl_points);
+     }
+
+     std::deque<Point2D>deque_path;
+     robot_radius *= inv_resolution;
+     plan_in(wall_polygon_points,obstacl_polygon_points,robot_radius,deque_path);
+     for(auto p : deque_path){
+         Vector2d path_point = map2world(p.x,p.y);
+         path.push_back(Vector2d(path_point(0),path_point(1)));
+     }
+
+}
+
+
+void bcd_planner::plan_in(std::vector<std::vector<cv::Point>>& wall_polygon, std::vector<std::vector<cv::Point>>&obstcal_polygon, double robot_radius, std::deque<Point2D>& path){
 
     cv::Mat1b map = cv::Mat1b(cv::Size(600, 600), CV_8U);        //初始化map
     map.setTo(0);
@@ -57,27 +99,38 @@ void bcd_planner::plan(std::vector<std::vector<cv::Point>>& wall_polygon, std::v
     cv::fillPoly(map_, wall_contours, cv::Scalar(255, 255, 255));
     cv::fillPoly(map_, obstacle_contours, cv::Scalar(0, 0, 0));
 
+
     std::vector<Event> wall_event_list = GenerateWallEventList(map_, wall);                              //根据wall polygon中的每个点的event类型来生成wall_event_list                                                       
     std::vector<Event> obstacle_event_list = GenerateObstacleEventList(map_, obstacles);                 //根据obstacle_event_list中的每个点的event类型来生成obstac_event_list
     std::deque<std::deque<Event>> slice_list = SliceListGenerator(wall_event_list, obstacle_event_list);
-    CheckSlicelist(slice_list);
-
+    if(show_map){
+        CheckSlicelist(slice_list);
+    }
+    
     std::vector<CellNode> cell_graph;
     std::vector<int> cell_index_slice;
     std::vector<int> original_cell_index_slice;
     ExecuteCellDecomposition(cell_graph, cell_index_slice, original_cell_index_slice, slice_list);
-    CheckPointType(map, wall ,obstacles);
-    CheckGeneratedCells(map, cell_graph);
 
+    if(show_map){
+        CheckPointType(map, wall ,obstacles);
+        CheckGeneratedCells(map, cell_graph);
+    }
+  
     Point2D start = cell_graph.front().ceiling.front();
     std::deque<std::deque<Point2D>> original_planning_path = StaticPathPlanning(map, cell_graph, start, robot_radius, false, false);
-    CheckPathNodes(original_planning_path);
-
+    if(show_map){
+        CheckPathNodes(original_planning_path);
+    }
+   
     path = FilterTrajectory(original_planning_path);
-    CheckPathConsistency(path);
-
-    int time_interval = 1;
-    VisualizeTrajectory(map, path, robot_radius, PATH_MODE, time_interval);
+    if(show_map){
+        CheckPathConsistency(path);
+        int time_interval = 1;
+        VisualizeTrajectory(map, path, robot_radius, PATH_MODE, time_interval);
+    }
+   
+    
  }
 
 int bcd_planner::WrappedIndex(int index, int list_length){
@@ -3007,17 +3060,11 @@ cv::Mat1b bcd_planner::PreprocessMap(const cv::Mat1b& original_map){
 void bcd_planner::ExtractRawContours(const cv::Mat& original_map, std::vector<std::vector<cv::Point>>& raw_wall_contours, std::vector<std::vector<cv::Point>>& raw_obstacle_contours){
     cv::Mat map = original_map.clone();
     cv::threshold(map, map, 128, 255, cv::THRESH_BINARY_INV);
-    cv::namedWindow("map",cv::WINDOW_NORMAL);
-    cv::imshow("map",map);
-    cv::waitKey();
-
     cv::cvtColor(map, map, cv::COLOR_GRAY2BGR);
-    cv::imshow("map",map);
-    cv::waitKey();
 
     std::vector<std::vector<cv::Point>> contours;
     cv::findContours(original_map.clone(), contours, cv::RETR_LIST, cv::CHAIN_APPROX_NONE);
-    std::cout<<"contours size "<<contours.size()<<std::endl;
+   // std::cout<<"contours size "<<contours.size()<<std::endl;
 
     std::vector<std::vector<cv::Point>> contours_new;
     int width = original_map.cols;
@@ -3027,12 +3074,11 @@ void bcd_planner::ExtractRawContours(const cv::Mat& original_map, std::vector<st
             contours_new.push_back(contours[i]);
         }
     }
-    std::cerr << "contour_new size: " << contours_new.size() << std::endl;
+    //std::cerr << "contour_new size: " << contours_new.size() << std::endl;
     cv::Mat map_show = original_map.clone();
     cv::cvtColor(map_show, map_show, CV_GRAY2RGB);
     cv::drawContours(map_show, contours_new, -1, cv::Scalar(0, 255, 0), 2);
-    cv::imshow("img_show", map_show);
-    cv::waitKey();
+
     std::vector<int> wall_cnt_indices(contours_new.size());
     std::iota(wall_cnt_indices.begin(), wall_cnt_indices.end(), 0);
 
@@ -3045,14 +3091,11 @@ void bcd_planner::ExtractRawContours(const cv::Mat& original_map, std::vector<st
 
     cv::Mat mask = cv::Mat(original_map.size(), original_map.type(), 255);
     cv::fillPoly(mask, raw_wall_contours, 0);
-    cv::imshow("map",mask);
-    cv::waitKey();
 
     cv::Mat base = original_map.clone();
     base += mask;
     cv::threshold(base, base, 128, 255, cv::THRESH_BINARY_INV);    
-    cv::imshow("map",base);
-    cv::waitKey();
+
 
     cv::findContours(base, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
     raw_obstacle_contours = contours;
@@ -4928,3 +4971,41 @@ void bcd_planner::TestAllExamples(){
     // StaticPathPlanningExample6();
 
 }
+
+void bcd_planner::init(){
+    t_map_world.setIdentity();
+    Vector3d x_axis;  x_axis<<1.0, 0.0, 0.0;
+    Vector3d y_axis;  y_axis<<0.0,-1.0, 0.0;
+    Vector3d z_axis;  z_axis<<0.0, 0.0, 1.0;
+    Vector3d pos;     pos<<   -15, 15,  0.0;
+    t_map_world.block<3,1>(0,0) = x_axis;
+    t_map_world.block<3,1>(0,1) = y_axis;
+    t_map_world.block<3,1>(0,2) = z_axis;
+    t_map_world.block<3,1>(0,3) = pos;
+
+    resolution = 0.05;  
+    inv_resolution = 1.0/resolution;
+    num_of_colums = 600;
+    num_of_rows = 600;
+}
+
+Vector2i bcd_planner::world2map(double x,double y){
+    Vector4d pos_in_world;  pos_in_world<<x,y,0,1.0;
+    Vector4d pos_in_map = t_map_world.inverse() * pos_in_world;
+
+    int col = std::min(std::max(int(pos_in_map(0)* inv_resolution),0),int(num_of_colums - 1));
+    int row = std::min(std::max(int(pos_in_map(1)* inv_resolution),0),int(num_of_rows - 1));
+    Vector2i res; res<<col, row;
+    return res;
+}
+
+
+ Vector2d bcd_planner::map2world(int col, int row){
+    double x_in_map = col * resolution;
+    double y_in_map = row * resolution;
+    Vector4d pos_in_map; pos_in_map<<x_in_map, y_in_map, 0,1.0;
+    Vector4d pos_in_world = t_map_world*pos_in_map;
+
+    Vector2d res; res<<pos_in_world(0),pos_in_world(1);
+    return res;
+ }

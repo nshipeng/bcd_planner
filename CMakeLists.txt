@@ -22,6 +22,7 @@ message(${PROJECT_NAME})
 
 add_library(${PROJECT_NAME} SHARED
     src/bcd_planner.cpp
+    src/bcd_planner_wrapper.cpp
 )
 
 target_link_libraries(${PROJECT_NAME}
