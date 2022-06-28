@@ -215,9 +215,9 @@ class bcd_planner
     public:
        bcd_planner();
 
-       void plan(std::vector<std::vector<cv::Point>>& wall_polygon, std::vector<std::vector<cv::Point>>&obstcal_polygon, double robot_radius,std::deque<Point2D>& path);
-       void plan(std::vector<std::vector<Vector2d>>& wall_polygon, std::vector<std::vector<Vector2d>>&obstcal_polygon, double robot_radius,std::deque<Vector2d>& path);
-       void plan(std::vector<std::vector<Vector3d>>& wall_polygon, std::vector<std::vector<Vector3d>>&obstcal_polygon, double robot_radius,std::deque<Vector2d>& path);
+       void plan(std::vector<std::vector<cv::Point>>& wall_polygon, std::vector<std::vector<cv::Point>>&obstcal_polygon, double robot_radius,double step,std::deque<Point2D>& path);
+       void plan(std::vector<std::vector<Vector2d>>& wall_polygon, std::vector<std::vector<Vector2d>>&obstcal_polygon, double robot_radius,double step,std::deque<Vector2d>& path);
+       void plan(std::vector<std::vector<Vector3d>>& wall_polygon, std::vector<std::vector<Vector3d>>&obstcal_polygon, double robot_radius,double step,std::deque<Vector2d>& path);
 
        
        void TestAllExamples();
@@ -228,17 +228,21 @@ class bcd_planner
 
         //data
         double robot_radius_;
+        double step;
         double resolution;                       //resolution of the map
         double inv_resolution;
         int num_of_colums;                        //map size  
         int num_of_rows;
         Matrix4d t_map_world;                      //first convert world polygon data to map
-        bool show_map = false;
+        bool show_map = true;
 
-        void init();                      //set t_map_world  
+        void init();                      //set t_map_world 
+        void inflation(cv::Mat& map,double robot_radius);   //problem here.
         Vector2i world2map(double x,double y);
         Vector2d map2world(int col, int row);   
-        void plan_in(std::vector<std::vector<cv::Point>>& wall_polygon, std::vector<std::vector<cv::Point>>&obstcal_polygon, double robot_radius, std::deque<Point2D>& path);
+        void plan_in(std::vector<std::vector<cv::Point>>& wall_polygon, std::vector<std::vector<cv::Point>>&obstcal_polygon, double robot_radius,double step, std::deque<Point2D>& path);
+        void scal_polygon(std::vector<Vector2d>& wall_polygon,double robot_radius);
+        //void scal_polygon(std::vector<Vector3d>& wall_polygon,double robot_radius,std::vector<Vector2d>& scal_polygon);
 
         int WrappedIndex(int index, int list_length);
         void WalkThroughGraph(std::vector<CellNode>& cell_graph, int cell_index, int& unvisited_counter, std::deque<CellNode>& path); //DFS

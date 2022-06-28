@@ -2,6 +2,10 @@
  * @Description: 
  * @Autor: 
  */
+/*
+ * @Description: 
+ * @Autor: 
+ */
 #ifndef _BCD_PLANNER_WRAPPER_H_
 #define _BCD_PLANNER_WRAPPER_H_
 
@@ -21,8 +25,14 @@ class bcd_planner_wrapper
     public:
        bcd_planner_wrapper();
 
-       void plan(std::vector<std::vector<Vector2d>>& wall_polygon, std::vector<std::vector<Vector2d>>&obstcal_polygon, double robot_radius,std::deque<Vector2d>& path);
-       void plan(std::vector<std::vector<Vector3d>>& wall_polygon, std::vector<std::vector<Vector3d>>&obstcal_polygon, double robot_radius,std::deque<Vector2d>& path);
+       /**
+        * @description: 
+        * @param {double} robot_radius
+        * @param {double} step: two paraller move distance
+        * @return {*} coverage path
+        */
+       void plan(std::vector<std::vector<Vector2d>>& wall_polygon, std::vector<std::vector<Vector2d>>&obstcal_polygon, double robot_radius,double step,std::deque<Vector2d>& path);
+       void plan(std::vector<std::vector<Vector3d>>& wall_polygon, std::vector<std::vector<Vector3d>>&obstcal_polygon, double robot_radius,double step,std::deque<Vector2d>& path);
 
 
     private:
